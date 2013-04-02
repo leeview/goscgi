@@ -63,7 +63,7 @@ var footer = `
 
 Nginx configuration
 -------------------
-Locate Nginx configuration file. In Ubuntu it may be located at /etc/nginx/sites-enabled/default.
+Locate Nginx configuration file. In Ubuntu it may be located at `/etc/nginx/sites-enabled/default`.
 Add scgi_pass & include scgi_params directives in the root location.
 ~~~
 location / {
@@ -73,7 +73,7 @@ location / {
 }
 ~~~
 If you use unix sockets, (it's slightly faster than tcp) don't forget to give write permission
-to www-data (default nginx user) on the socket file.
+to www-data (default nginx user) on the socket file (created at runtime).
 The example above, uses tcp sockets and doesn't need any special treatment.
-Save the config file & restart the Nginx service. In Ubuntu: sudo service nginx restart
-Acccess http://localhost/anyurl
+Save the config file & restart the Nginx service. In Ubuntu: `sudo service nginx restart`.
+Acccess `http://localhost/anyurl`.
