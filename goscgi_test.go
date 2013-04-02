@@ -1,3 +1,7 @@
+// Copyright 2013 Liviu G. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package goscgi
 
 import (
@@ -20,7 +24,9 @@ func Test_All(t *testing.T) {
 	time.Sleep(time.Second)
 
 	startClient()
-	close(srv.Close) // signal server to stop listening
+
+	 // signal server to stop listening
+	srv.Close <- true
 
 	log.Println("test done")
 }
@@ -60,6 +66,7 @@ func startClient() {
 	header["CONTENT_TYPE"] = "text/plain"
 	content := "this is a test request"
 
+	// we send an SCGI request
 	sendRequest(conn, header, content)
 	time.Sleep(time.Second)
 
@@ -72,7 +79,7 @@ func startClient() {
 		if readCnt == 0 {
 			return
 		}
-		log.Println(string(buff[:readCnt]))
+		println(string(buff[:readCnt]))
 	}
 }
 
