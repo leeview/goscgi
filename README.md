@@ -5,7 +5,10 @@ SimpleCGI protocol implementation for Go lang. Allows creation of a basic HTTP s
 
 Usage
 -----
-
+Install Nginx. See `Nginx configuration`. Create a classic Go folder structure `goscgi/src`. Set $GOPATH to `path/to/goscgi`.
+Run `go get github.com/leeview/goscgi` inside `goscgi` folder. Create folder `goscgi/src/main`
+and copy the example below in `goscgi/src/main/main.go`. Build and run the application. Acccess `http://localhost/anyurl`.
+You should see a list of HTTP header fields passed from Nginx to goscgi.
 ~~~
 package main
 
@@ -76,4 +79,4 @@ If you use unix sockets, (it's slightly faster than tcp) don't forget to give wr
 to www-data (default nginx user) on the socket file (created at runtime).
 The example above, uses tcp sockets and doesn't need any special treatment.
 Save the config file & restart the Nginx service. In Ubuntu: `sudo service nginx restart`.
-Acccess `http://localhost/anyurl`.
+
