@@ -115,7 +115,7 @@ func sendRequest(conn net.Conn, header map[string]string, content string) {
 		conn.Write(zero)
 		fmt.Fprint(conn, v)
 		conn.Write(zero)
-		log.Println("sent ", k, "=", v)
+		log.Println("sent ", k, " = ", v)
 	}
 
 	fmt.Fprint(conn, ",")
