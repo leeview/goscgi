@@ -6,6 +6,7 @@ package goscgi
 
 import (
 	"net"
+	"net/http"
 	"strconv"
 	"time"
 )
@@ -14,6 +15,7 @@ type Response struct {
 	ResponseCode []byte
 	ContentType  []byte
 	Content      []byte
+	Cookies      []*http.Cookie
 	Header       map[string]string
 }
 
@@ -42,6 +44,9 @@ func NewResponse(respCode, contentType []byte, content []byte) *Response {
 	resp.Header = make(map[string]string)
 	return &resp
 }
+
+//TODO add func SetCookie
+//TODO implement write Cookies
 
 func (resp *Response) Write(conn net.Conn, timeout time.Duration) error {
 	var err error

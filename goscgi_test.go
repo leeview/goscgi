@@ -25,7 +25,7 @@ func Test_All(t *testing.T) {
 
 	startClient()
 
-	 // signal server to stop listening
+	// signal server to stop listening
 	srv.Close <- true
 
 	log.Println("test done")
@@ -41,7 +41,11 @@ func startServer(srv *Server) {
 func requestHandler(req *Request) *Response {
 	log.Println()
 	log.Println("handling request:")
+	log.Println(req.URL.Path)
 	for k, v := range req.Header {
+		log.Println(k, " = ", v)
+	}
+	for k, v := range req.Query {
 		log.Println(k, " = ", v)
 	}
 	if len(req.Content) > 0 {
@@ -61,7 +65,7 @@ func startClient() {
 
 	header := make(map[string]string)
 	header["CONTENT_LENGTH"] = "" // will be computed later
-	header["REQUEST_URI"] = "/cgi/test.cgi"
+	header["REQUEST_URI"] = "/cgi/test.cgi?arg1=val1&arg2=val2"
 	header["REQUEST_METHOD"] = "GET"
 	header["CONTENT_TYPE"] = "text/plain"
 	content := "this is a test request"

@@ -22,7 +22,7 @@ type Server struct {
 }
 
 type Handler struct {
-	Uri  string
+	Path string
 	Func HandlerFunc
 }
 
@@ -41,8 +41,8 @@ func NewServer(s *Settings) *Server {
 	return srv
 }
 
-func (srv *Server) AddHandler(uri string, handler HandlerFunc) {
-	srv.Handlers = append(srv.Handlers, Handler{uri, handler})
+func (srv *Server) AddHandler(path string, handler HandlerFunc) {
+	srv.Handlers = append(srv.Handlers, Handler{path, handler})
 }
 
 func (srv *Server) ListenTcp(port string) error {
@@ -124,7 +124,7 @@ func (srv *Server) handleConn(conn net.Conn) {
 func (srv *Server) handleReq(req *Request) {
 	var err error
 	timeout := srv.Settings.WriteTimeout
-	if handler := srv.getHandler(req.URI); handler != nil {
+	if handler := srv.getHandler(req.URL.Path); handler != nil {
 		if resp := handler(req); resp != nil {
 			err = resp.Write(req.Connection, timeout)
 		} else {
@@ -138,9 +138,9 @@ func (srv *Server) handleReq(req *Request) {
 	}
 }
 
-func (srv *Server) getHandler(requestUri string) HandlerFunc {
+func (srv *Server) getHandler(path string) HandlerFunc {
 	for _, handler := range srv.Handlers {
-		if strings.HasPrefix(requestUri, handler.Uri) {
+		if strings.HasPrefix(path, handler.Path) {
 			return handler.Func
 		}
 	}

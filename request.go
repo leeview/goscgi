@@ -6,6 +6,8 @@ package goscgi
 
 import (
 	"net"
+	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 )
@@ -13,12 +15,14 @@ import (
 type Request struct {
 	Connection  net.Conn
 	Header      Header
-	URI         string
-	DocumentURI string
-	QueryString string
+	RawURI      string
+	URL         *url.URL
+	Query       url.Values
+	Cookies     []*http.Cookie
 	Method      byte
 	IsAJAX      bool
 	IsWebSocket bool
+	UserAgent   string
 	Content     []byte
 	ContentType string
 }
@@ -42,6 +46,7 @@ const (
 	RemotePortKey    = "REMOTE_PORT"
 	RequestedWithKey = "HTTP_X_REQUESTED_WITH"
 	HttpUpgradeKey   = "HTTP_UPGRADE"
+	HttpUserAgentKey = "HTTP_USER_AGENT"
 )
 
 func ReadRequest(conn net.Conn, settings *Settings) (*Request, error) {
@@ -79,11 +84,7 @@ func ReadRequest(conn net.Conn, settings *Settings) (*Request, error) {
 	req.Header = header
 	req.Content = content
 
-	// extract content type
-	if contentType, ok := header[ContentTypeKey]; ok {
-		req.ContentType = contentType
-	}
-
+	var ok bool
 	// extract request method
 	if methodStr, ok := header[RequestMethodKey]; ok {
 		switch methodStr {
@@ -98,20 +99,23 @@ func ReadRequest(conn net.Conn, settings *Settings) (*Request, error) {
 		}
 	}
 
-	// extract request uri
-	if requestUri, ok := header[RequestUriKey]; ok {
-		req.URI = requestUri
+	// extract request uri & parse url
+	if req.RawURI, ok = header[RequestUriKey]; ok {
+		if req.URL, err = url.ParseRequestURI(req.RawURI); err != nil {
+			return nil, err
+		}
+		if req.Query, err = url.ParseQuery(req.URL.RawQuery); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, InvalidHeaderErr
 	}
 
-	// extract document uri
-	if documentUri, ok := header[DocumentUriKey]; ok {
-		req.DocumentURI = documentUri
-	}
+	// extract content type & user agent
+	req.ContentType = header[ContentTypeKey]
+	req.UserAgent = header[HttpUserAgentKey]
 
-	// extract query string
-	if queryString, ok := header[QueryStringKey]; ok {
-		req.QueryString = queryString
-	}
+	//TODO parse Cookies
 
 	// HTTP_X_REQUESTED_WITH = XMLHttpRequest ?
 	if requestedWith, ok := header[RequestedWithKey]; ok {
@@ -125,9 +129,12 @@ func ReadRequest(conn net.Conn, settings *Settings) (*Request, error) {
 	return &req, nil
 }
 
-/*
-TODO
--decode the URI & split URI parts
--decode the content if it's form-encoded
--decode multipart content using mime/multipart package
-*/
+func (req *Request) ParseForm() error {
+	//TODO
+	return nil
+}
+
+func (req *Request) ParseMultipartForm() error {
+	//TODO
+	return nil
+}
