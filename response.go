@@ -46,6 +46,10 @@ func NewResponse(respCode, contentType []byte, content []byte) *Response {
 }
 
 //TODO add func SetCookie
+func (resp *Response) SetCookie(cookie *http.Cookie) {
+
+}
+
 //TODO implement write Cookies
 
 func (resp *Response) Write(conn net.Conn, timeout time.Duration) error {
