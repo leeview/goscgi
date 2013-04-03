@@ -25,8 +25,8 @@ func Test_All(t *testing.T) {
 
 	startClient()
 
-	// signal server to stop listening
-	srv.Close <- true
+	// signal server to stop listening but don't wait
+	close(srv.Close)
 
 	log.Println("test done")
 }
@@ -45,15 +45,14 @@ func requestHandler(req *Request) *Response {
 	for k, v := range req.Query {
 		log.Println(k, " = ", v)
 	}
+	for k, v := range req.Form {
+		log.Println(k, " = ", v)
+	}
 	for k, v := range req.Header {
 		log.Println(k, " = ", v)
 	}
-	if req.ContentSize > 0 {
-		if err := req.ReadContent(time.Second * 3); err != nil {
-			log.Println("req.ReadContent:", err.Error())
-		} else {
-			log.Println(string(req.Content))
-		}
+	if req.ContentSize > 0 && len(req.Content) > 0 {
+		log.Println(string(req.Content))
 	}
 
 	return NewResponse(RespCodeOK, RespTypeHtml, []byte("this is a test response"))

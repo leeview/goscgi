@@ -5,6 +5,8 @@
 package goscgi
 
 import (
+	"mime"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"net/url"
@@ -13,18 +15,21 @@ import (
 )
 
 type Request struct {
-	Connection  net.Conn
-	Header      Header
-	RawURI      string
-	URL         *url.URL
-	Query       url.Values
-	Cookies     []*http.Cookie
-	Method      byte
-	IsAJAX      bool
-	UserAgent   string
-	Content     []byte
-	ContentType string
-	ContentSize int64
+	Connection    net.Conn
+	Header        Header
+	RawURI        string
+	URL           *url.URL
+	Query         url.Values
+	Form          url.Values
+	MultipartForm *multipart.Form
+	Cookies       []*http.Cookie
+	Method        byte
+	IsAJAX        bool
+	UserAgent     string
+	Content       []byte
+	ContentType   string
+	ContentSize   int64
+	Settings      *Settings // settings used while reading this request
 }
 
 const (
@@ -57,6 +62,7 @@ const (
 func ReadRequest(conn net.Conn, settings *Settings) (*Request, error) {
 	req := Request{}
 	req.Connection = conn
+	req.Settings = settings
 
 	var err error
 	if req.Header, err = ReadHeader(conn, settings); err != nil {
@@ -71,6 +77,31 @@ func ReadRequest(conn net.Conn, settings *Settings) (*Request, error) {
 		}
 		if req.ContentSize > settings.MaxContentSize {
 			return nil, InvalidContentErr
+		}
+		if req.ContentSize > 0 {
+			if contentType, ok := req.Header[ContentTypeKey]; ok {
+				if len(contentType) == 0 {
+					return nil, InvalidContentErr
+				}
+				if contentType, _, err = mime.ParseMediaType(contentType); err != nil {
+					return nil, err
+				} else {
+					switch contentType {
+					case ContentTypeForm:
+						if err = req.parseForm(); err != nil {
+							return nil, err
+						}
+					case ContentTypeMultipartForm:
+						if err = req.parseMultipartForm(); err != nil {
+							return nil, err
+						}
+					default:
+						if err = req.readContent(); err != nil {
+							return nil, err
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -88,7 +119,7 @@ func ReadRequest(conn net.Conn, settings *Settings) (*Request, error) {
 		}
 	}
 
-	// extract request uri & parse url
+	// extract request uri & parse url + query string
 	if req.RawURI, ok = req.Header[RequestUriKey]; ok {
 		if req.URL, err = url.ParseRequestURI(req.RawURI); err != nil {
 			return nil, err
@@ -100,8 +131,7 @@ func ReadRequest(conn net.Conn, settings *Settings) (*Request, error) {
 		return nil, InvalidHeaderErr
 	}
 
-	// extract content type & user agent
-	req.ContentType = req.Header[ContentTypeKey]
+	// extract user agent
 	req.UserAgent = req.Header[HttpUserAgentKey]
 
 	// HTTP_X_REQUESTED_WITH = XMLHttpRequest ?
@@ -112,34 +142,41 @@ func ReadRequest(conn net.Conn, settings *Settings) (*Request, error) {
 	return &req, nil
 }
 
-func (req *Request) ReadContent(timeout time.Duration) error {
-	if req.ContentSize > 0 && len(req.Content) == 0 {
-		content := make([]byte, req.ContentSize)
-		var alreadyRead int64
-		for alreadyRead < req.ContentSize {
-			req.Connection.SetReadDeadline(time.Now().Add(timeout))
-			if readCnt, err := req.Connection.Read(content[alreadyRead:]); err != nil {
-				return err
-			} else {
-				alreadyRead += int64(readCnt)
-			}
+func (req *Request) readContent() error {
+	content := make([]byte, req.ContentSize)
+	var alreadyRead int64
+	for alreadyRead < req.ContentSize {
+		req.Connection.SetReadDeadline(time.Now().Add(req.Settings.ReadTimeout))
+		if readCnt, err := req.Connection.Read(content[alreadyRead:]); err != nil {
+			return err
+		} else {
+			alreadyRead += int64(readCnt)
 		}
-		req.Content = content
+	}
+	req.Content = content
+	return nil
+}
+
+func (req *Request) parseForm() error {
+	var err error
+	if err = req.readContent(); err != nil {
+		return err
+	}
+	if req.Form, err = url.ParseQuery(string(req.Content)); err != nil {
+		return err
 	}
 	return nil
 }
 
-func (req *Request) ParseCookies() error {
-	//TODO see go source
+func (req *Request) parseMultipartForm() error {
+	var err error
+	if err = req.readContent(); err != nil {
+		return err
+	}
 	return nil
 }
 
-func (req *Request) ParseForm() error {
-	//TODO call ReadContent if len(req.Content) == 0
-	return nil
-}
-
-func (req *Request) ParseMultipartForm() error {
+func (req *Request) parseCookies() error {
 	//TODO
 	return nil
 }
