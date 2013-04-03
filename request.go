@@ -35,6 +35,11 @@ const (
 )
 
 const (
+	ContentTypeForm          = "application/x-www-form-urlencoded"
+	ContentTypeMultipartForm = "multipart/form-data"
+)
+
+const (
 	ContentSizeKey   = "CONTENT_LENGTH"
 	ContentTypeKey   = "CONTENT_TYPE"
 	RequestMethodKey = "REQUEST_METHOD"
