@@ -42,14 +42,18 @@ func requestHandler(req *Request) *Response {
 	log.Println()
 	log.Println("handling request:")
 	log.Println(req.URL.Path)
-	for k, v := range req.Header {
-		log.Println(k, " = ", v)
-	}
 	for k, v := range req.Query {
 		log.Println(k, " = ", v)
 	}
-	if len(req.Content) > 0 {
-		log.Println(string(req.Content))
+	for k, v := range req.Header {
+		log.Println(k, " = ", v)
+	}
+	if req.ContentSize > 0 {
+		if err := req.ReadContent(time.Second * 3); err != nil {
+			log.Println("req.ReadContent:", err.Error())
+		} else {
+			log.Println(string(req.Content))
+		}
 	}
 
 	return NewResponse(RespCodeOK, RespTypeHtml, []byte("this is a test response"))

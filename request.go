@@ -21,10 +21,10 @@ type Request struct {
 	Cookies     []*http.Cookie
 	Method      byte
 	IsAJAX      bool
-	IsWebSocket bool
 	UserAgent   string
 	Content     []byte
 	ContentType string
+	ContentSize int64
 }
 
 const (
@@ -50,43 +50,27 @@ const (
 )
 
 func ReadRequest(conn net.Conn, settings *Settings) (*Request, error) {
-	header, err := ReadHeader(conn, settings)
-	if err != nil {
+	req := Request{}
+	req.Connection = conn
+
+	var err error
+	if req.Header, err = ReadHeader(conn, settings); err != nil {
 		return nil, err
 	}
 
-	// parse content size & read content
-	var content []byte
-	if contentSizeStr, ok := header[ContentSizeKey]; ok && len(contentSizeStr) > 0 {
-		contentSize, err := strconv.ParseInt(contentSizeStr, 10, 0)
+	var ok bool
+	if contentSizeStr, ok := req.Header[ContentSizeKey]; ok && len(contentSizeStr) > 0 {
+		req.ContentSize, err = strconv.ParseInt(contentSizeStr, 10, 0)
 		if err != nil {
 			return nil, err
 		}
-		if contentSize > settings.MaxContentSize {
+		if req.ContentSize > settings.MaxContentSize {
 			return nil, InvalidContentErr
-		}
-		if contentSize > 0 {
-			content = make([]byte, contentSize)
-			var alreadyRead int64
-			for alreadyRead < contentSize {
-				conn.SetReadDeadline(time.Now().Add(settings.ReadTimeout))
-				if readCnt, err := conn.Read(content[alreadyRead:]); err != nil {
-					return nil, err
-				} else {
-					alreadyRead += int64(readCnt)
-				}
-			}
 		}
 	}
 
-	req := Request{}
-	req.Connection = conn
-	req.Header = header
-	req.Content = content
-
-	var ok bool
 	// extract request method
-	if methodStr, ok := header[RequestMethodKey]; ok {
+	if methodStr, ok := req.Header[RequestMethodKey]; ok {
 		switch methodStr {
 		case "GET":
 			req.Method = GET
@@ -100,7 +84,7 @@ func ReadRequest(conn net.Conn, settings *Settings) (*Request, error) {
 	}
 
 	// extract request uri & parse url
-	if req.RawURI, ok = header[RequestUriKey]; ok {
+	if req.RawURI, ok = req.Header[RequestUriKey]; ok {
 		if req.URL, err = url.ParseRequestURI(req.RawURI); err != nil {
 			return nil, err
 		}
@@ -112,25 +96,41 @@ func ReadRequest(conn net.Conn, settings *Settings) (*Request, error) {
 	}
 
 	// extract content type & user agent
-	req.ContentType = header[ContentTypeKey]
-	req.UserAgent = header[HttpUserAgentKey]
-
-	//TODO parse Cookies
+	req.ContentType = req.Header[ContentTypeKey]
+	req.UserAgent = req.Header[HttpUserAgentKey]
 
 	// HTTP_X_REQUESTED_WITH = XMLHttpRequest ?
-	if requestedWith, ok := header[RequestedWithKey]; ok {
+	if requestedWith, ok := req.Header[RequestedWithKey]; ok {
 		req.IsAJAX = (requestedWith == "XMLHttpRequest")
 	}
 
-	// HTTP_UPGRADE = WebSocket ?
-	if upgrade, ok := header[HttpUpgradeKey]; ok {
-		req.IsWebSocket = (upgrade == "websocket" || upgrade == "WebSocket")
-	}
 	return &req, nil
 }
 
+func (req *Request) ReadContent(timeout time.Duration) error {
+	if req.ContentSize > 0 && len(req.Content) == 0 {
+		content := make([]byte, req.ContentSize)
+		var alreadyRead int64
+		for alreadyRead < req.ContentSize {
+			req.Connection.SetReadDeadline(time.Now().Add(timeout))
+			if readCnt, err := req.Connection.Read(content[alreadyRead:]); err != nil {
+				return err
+			} else {
+				alreadyRead += int64(readCnt)
+			}
+		}
+		req.Content = content
+	}
+	return nil
+}
+
+func (req *Request) ParseCookies() error {
+	//TODO see go source
+	return nil
+}
+
 func (req *Request) ParseForm() error {
-	//TODO
+	//TODO call ReadContent if len(req.Content) == 0
 	return nil
 }
 
