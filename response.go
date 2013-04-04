@@ -74,12 +74,6 @@ func (resp *Response) Write(conn net.Conn, timeout time.Duration) error {
 		conn.Write(crlf)
 	}
 
-	/*for k, v := range resp.Header {
-		conn.Write([]byte(k))
-		conn.Write(sep)
-		conn.Write([]byte(v))
-		conn.Write(crlf)
-	}*/
 	if err = resp.Header.Write(conn); err != nil {
 		return err
 	}
