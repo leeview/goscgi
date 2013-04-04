@@ -42,6 +42,7 @@ func requestHandler(req *Request) *Response {
 	log.Println()
 	log.Println("handling request:")
 	log.Println(req.URL.Path)
+	log.Println(req.ContentType)
 	for k, v := range req.Query {
 		log.Println(k, " = ", v)
 	}

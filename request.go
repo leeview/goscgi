@@ -85,6 +85,7 @@ func ReadRequest(conn net.Conn, settings *Settings) (*Request, error) {
 				if contentType, params, err := mime.ParseMediaType(contentType); err != nil {
 					return nil, err
 				} else {
+					req.ContentType = contentType
 					switch contentType {
 					case ContentTypeForm:
 						if err = req.parseForm(); err != nil {
@@ -136,13 +137,8 @@ func ReadRequest(conn net.Conn, settings *Settings) (*Request, error) {
 	}
 
 	req.parseCookies()
-
-	// extract user agent
 	req.UserAgent = req.Header.Get(HttpUserAgentKey)
-
-	// HTTP_X_REQUESTED_WITH = XMLHttpRequest ?
-	requestedWith := req.Header.Get(RequestedWithKey)
-	req.IsAJAX = (requestedWith == "XMLHttpRequest")
+	req.IsAJAX = (req.Header.Get(RequestedWithKey) == "XMLHttpRequest")
 
 	return &req, nil
 }
