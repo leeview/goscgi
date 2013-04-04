@@ -4,3 +4,4 @@ tests
 
 in request:
 parse multipart content from stream (now = buffering in memory)
+extract & parse HTTP_ACCEPT_LANGUAGE
