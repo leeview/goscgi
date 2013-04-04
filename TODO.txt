@@ -1,0 +1,6 @@
+add more adequate error codes in reponse
+add more descriptive error messages for logging
+tests
+
+in request:
+parse multipart content from stream (now = buffering in memory)
