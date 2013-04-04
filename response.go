@@ -16,7 +16,7 @@ type Response struct {
 	ContentType  []byte
 	Content      []byte
 	Cookies      []*http.Cookie
-	Header       map[string]string
+	Header       http.Header
 }
 
 var (
@@ -36,21 +36,23 @@ var (
 	RespCodeInternalError = []byte("500 Internal error")
 )
 
-func NewResponse(respCode, contentType []byte, content []byte) *Response {
+func NewResponse(respCode, contentType []byte, content []byte, cookies ...*http.Cookie) *Response {
 	resp := Response{}
 	resp.ResponseCode = respCode
 	resp.ContentType = contentType
 	resp.Content = content
-	resp.Header = make(map[string]string)
+	resp.Header = http.Header{}
+	for _, cookie := range cookies {
+		resp.SetCookie(cookie)
+	}
 	return &resp
 }
 
-//TODO add func SetCookie
 func (resp *Response) SetCookie(cookie *http.Cookie) {
-
+	if cookie != nil {
+		resp.Header.Add("Set-Cookie", cookie.String())
+	}
 }
-
-//TODO implement write Cookies
 
 func (resp *Response) Write(conn net.Conn, timeout time.Duration) error {
 	var err error
@@ -71,12 +73,17 @@ func (resp *Response) Write(conn net.Conn, timeout time.Duration) error {
 		conn.Write([]byte(strconv.FormatInt(contentSize, 10)))
 		conn.Write(crlf)
 	}
-	for k, v := range resp.Header {
+
+	/*for k, v := range resp.Header {
 		conn.Write([]byte(k))
 		conn.Write(sep)
 		conn.Write([]byte(v))
 		conn.Write(crlf)
+	}*/
+	if err = resp.Header.Write(conn); err != nil {
+		return err
 	}
+
 	conn.Write(crlf)
 	if contentSize > 0 {
 		// set a timeout for sending (large?) content

@@ -5,22 +5,25 @@
 package goscgi
 
 import (
+	"bytes"
 	"mime"
 	"mime/multipart"
 	"net"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
 type Request struct {
 	Connection    net.Conn
-	Header        Header
+	Header        http.Header
 	RawURI        string
 	URL           *url.URL
 	Query         url.Values
 	Form          url.Values
+	Files         map[string][]*multipart.FileHeader
 	MultipartForm *multipart.Form
 	Cookies       []*http.Cookie
 	Method        byte
@@ -55,6 +58,7 @@ const (
 	RemoteAddrKey    = "REMOTE_ADDR"
 	RemotePortKey    = "REMOTE_PORT"
 	RequestedWithKey = "HTTP_X_REQUESTED_WITH"
+	HttpCookieKey    = "HTTP_COOKIE"
 	HttpUpgradeKey   = "HTTP_UPGRADE"
 	HttpUserAgentKey = "HTTP_USER_AGENT"
 )
@@ -69,21 +73,16 @@ func ReadRequest(conn net.Conn, settings *Settings) (*Request, error) {
 		return nil, err
 	}
 
-	var ok bool
-	if contentSizeStr, ok := req.Header[ContentSizeKey]; ok && len(contentSizeStr) > 0 {
-		req.ContentSize, err = strconv.ParseInt(contentSizeStr, 10, 0)
-		if err != nil {
+	if contentSizeStr := req.Header.Get(ContentSizeKey); len(contentSizeStr) > 0 {
+		if req.ContentSize, err = strconv.ParseInt(contentSizeStr, 10, 0); err != nil {
 			return nil, err
 		}
 		if req.ContentSize > settings.MaxContentSize {
 			return nil, InvalidContentErr
 		}
 		if req.ContentSize > 0 {
-			if contentType, ok := req.Header[ContentTypeKey]; ok {
-				if len(contentType) == 0 {
-					return nil, InvalidContentErr
-				}
-				if contentType, _, err = mime.ParseMediaType(contentType); err != nil {
+			if contentType := req.Header.Get(ContentTypeKey); len(contentType) > 0 {
+				if contentType, params, err := mime.ParseMediaType(contentType); err != nil {
 					return nil, err
 				} else {
 					switch contentType {
@@ -92,7 +91,9 @@ func ReadRequest(conn net.Conn, settings *Settings) (*Request, error) {
 							return nil, err
 						}
 					case ContentTypeMultipartForm:
-						if err = req.parseMultipartForm(); err != nil {
+						if boundary, ok := params["boundary"]; !ok {
+							return nil, InvalidContentErr
+						} else if err = req.parseMultipartForm(boundary); err != nil {
 							return nil, err
 						}
 					default:
@@ -101,26 +102,29 @@ func ReadRequest(conn net.Conn, settings *Settings) (*Request, error) {
 						}
 					}
 				}
+			} else {
+				return nil, InvalidHeaderErr // invalid contentType
 			}
 		}
 	}
 
 	// extract request method
-	if methodStr, ok := req.Header[RequestMethodKey]; ok {
-		switch methodStr {
-		case "GET":
-			req.Method = GET
-		case "POST":
-			req.Method = POST
-		case "PUT":
-			req.Method = PUT
-		case "DELETE":
-			req.Method = DELETE
-		}
+	methodStr := req.Header.Get(RequestMethodKey)
+	switch methodStr {
+	case "GET":
+		req.Method = GET
+	case "POST":
+		req.Method = POST
+	case "PUT":
+		req.Method = PUT
+	case "DELETE":
+		req.Method = DELETE
+	default:
+		return nil, InvalidHeaderErr // invalid method
 	}
 
 	// extract request uri & parse url + query string
-	if req.RawURI, ok = req.Header[RequestUriKey]; ok {
+	if req.RawURI = req.Header.Get(RequestUriKey); len(req.RawURI) > 0 {
 		if req.URL, err = url.ParseRequestURI(req.RawURI); err != nil {
 			return nil, err
 		}
@@ -131,13 +135,14 @@ func ReadRequest(conn net.Conn, settings *Settings) (*Request, error) {
 		return nil, InvalidHeaderErr
 	}
 
+	req.parseCookies()
+
 	// extract user agent
-	req.UserAgent = req.Header[HttpUserAgentKey]
+	req.UserAgent = req.Header.Get(HttpUserAgentKey)
 
 	// HTTP_X_REQUESTED_WITH = XMLHttpRequest ?
-	if requestedWith, ok := req.Header[RequestedWithKey]; ok {
-		req.IsAJAX = (requestedWith == "XMLHttpRequest")
-	}
+	requestedWith := req.Header.Get(RequestedWithKey)
+	req.IsAJAX = (requestedWith == "XMLHttpRequest")
 
 	return &req, nil
 }
@@ -168,15 +173,46 @@ func (req *Request) parseForm() error {
 	return nil
 }
 
-func (req *Request) parseMultipartForm() error {
+func (req *Request) parseMultipartForm(boundary string) error {
+	// can't make it work without prebuffering in memory all the multipart content !!!
+	// gives error: 'multipart: Part Read: read tcp 127.0.0.1:38904: i/o timeout' everytime
+	//reader := multipart.NewReader(req.Connection, boundary)
 	var err error
 	if err = req.readContent(); err != nil {
 		return err
 	}
+	// we pass the content as input stream to multipart.NewReader()
+	reader := multipart.NewReader(bytes.NewBuffer(req.Content), boundary)
+	if multipartForm, err := reader.ReadForm(req.Settings.MaxContentSize); err != nil {
+		return err
+	} else {
+		req.MultipartForm = multipartForm
+		req.Form = multipartForm.Value
+		req.Files = multipartForm.File
+	}
 	return nil
 }
 
-func (req *Request) parseCookies() error {
-	//TODO
-	return nil
+func (req *Request) parseCookies() {
+	if cookies := req.Header.Get(HttpCookieKey); len(cookies) > 0 {
+		parts := strings.Split(cookies, ";")
+		for idx := 0; idx < len(parts); idx++ {
+			if part := strings.TrimSpace(parts[idx]); len(part) > 0 {
+				var cookie *http.Cookie
+				if eqIdx := strings.Index(part, "="); eqIdx > 0 {
+					cookie = &http.Cookie{Name: part[:eqIdx], Value: unquoteStr(part[eqIdx+1:])}
+				} else {
+					cookie = &http.Cookie{Name: part}
+				}
+				req.Cookies = append(req.Cookies, cookie)
+			}
+		}
+	}
+}
+
+func unquoteStr(str string) string {
+	if len(str) > 1 && str[0] == '"' && str[len(str)-1] == '"' {
+		return str[1 : len(str)-1]
+	}
+	return str
 }

@@ -7,11 +7,10 @@ package goscgi
 import (
 	"errors"
 	"net"
+	"net/http"
 	"strconv"
 	"time"
 )
-
-type Header map[string]string
 
 var (
 	InvalidHeaderErr  = errors.New("Invalid header")
@@ -20,7 +19,7 @@ var (
 )
 
 // http://www.python.ca/scgi/protocol.txt
-func ReadHeader(conn net.Conn, settings *Settings) (Header, error) {
+func ReadHeader(conn net.Conn, settings *Settings) (http.Header, error) {
 	var err error
 	const buffSize = 8 // first we read only 8 bytes from which we determine the headerSize
 	var buff [buffSize]byte
@@ -70,7 +69,7 @@ func ReadHeader(conn net.Conn, settings *Settings) (Header, error) {
 		alreadyRead += readCnt
 	}
 
-	header := Header{}
+	header := http.Header{}
 	var name string
 	nameExpected := true
 	idx = 0
@@ -92,7 +91,7 @@ func ReadHeader(conn net.Conn, settings *Settings) (Header, error) {
 			name = str
 			nameExpected = false
 		} else {
-			header[name] = str
+			header.Add(name, str)
 			nameExpected = true
 		}
 		idx++ // skip 0
