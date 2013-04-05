@@ -1,10 +1,9 @@
-goscgi
-======
+## goscgi
 
 SimpleCGI protocol implementation for Go lang. Allows creation of a basic HTTP server if used with Nginx or other SCGI capable web server.
 
-Nginx configuration
--------------------
+### Nginx configuration
+
 Locate Nginx configuration file. In Ubuntu it may be located at `/etc/nginx/sites-enabled/default`.
 Add scgi_pass & include scgi_params directives in the root location.
 ~~~
@@ -19,12 +18,12 @@ to www-data (default nginx user) on the socket file (created at runtime).
 The examples below, use tcp sockets and don't need any special treatment.
 Save the config file & restart the Nginx service. In Ubuntu: `sudo service nginx restart`.
 
-Usage
------
+### Usage
+
 See `goscgi/benchmarks/test/main.go`.
 
-Benchmarking
-------------
+### Benchmarking
+
 Trying to see the performance of the SimpleCGI vs FastCGI vs Go Http server + Nginx proxy vs direct Go Http server,
  I performed some tests on my laptop Core2Duo P8400 2.6Ghz, using go version devel +3346bb37412c Fri Apr 05 13:43:18 2013 +1100 linux/amd64 and Apache Bench.
 The code and screenshots are available in `/benchmarks`.
@@ -43,14 +42,20 @@ Nginx configuration used:
         proxy_http_version 1.1;
     }
 ~~~ 
-Apache Bench: `ab -n 2000 -c 50 http://localhost` + /scgi ,/fcgi, /gosrv and :8082/gosrv when we access Go HTTP Server directly.
+Apache Bench: `ab -n 2000 -c 50 http://localhost` + /scgi ,/fcgi, /gosrv respectively :8082/gosrv when we access Go HTTP Server directly.
 
-Conclusions
------------
+*    ![SCGI vs FCGI vs proxied Go http server 1](https://github.com/leeview/goscgi/blob/master/benchmarks/ApacheBench_scgi_fcgi_gosrv_with_proxy1.png)
+*    ![SCGI vs FCGI vs proxied Go http server 2](https://github.com/leeview/goscgi/blob/master/benchmarks/ApacheBench_scgi_fcgi_gosrv_with_proxy2.png)
+*    ![SCGI vs FCGI vs proxied Go http server 3](https://github.com/leeview/goscgi/blob/master/benchmarks/ApacheBench_scgi_fcgi_gosrv_with_proxy3.png)
+*    ![SCGI vs FCGI vs direct Go http server 1](https://github.com/leeview/goscgi/blob/master/benchmarks/ApacheBench_scgi_fcgi_gosrv_with_no_proxy1.png)
+*    ![SCGI vs FCGI vs direct Go http server 2](https://github.com/leeview/goscgi/blob/master/benchmarks/ApacheBench_scgi_fcgi_gosrv_with_no_proxy2.png)
+
+### Conclusions
+
 I don't pretend this benchmarking is very precise but still there are some interesting indications:
-	1. Acording to Apache Bench, FastCGI is not so fast compared to SimpleCGI in this particular scenario.
-	2. Surprisingly for me, Nginx Http Proxy + Go Http Server is (much?) faster than Nginx + (FastCGI | SimpleCGI) + Go Http Server
-	3. Not so surprisingly, accessing Go Http Server directly(no proxy), is faster than all the previous variants.
+1.    Acording to Apache Bench, FastCGI is not so fast compared to SimpleCGI in this particular scenario.
+2.    Surprisingly for me, Nginx Http Proxy + Go Http Server is (much?) faster than Nginx + (FastCGI | SimpleCGI) + Go Http Server
+3.    Not so surprisingly, accessing Go Http Server directly(no proxy), is faster than all the previous variants.
 
 Therefore if you intend to host some Go web apps behind Nginx and you are not sure what protocol to pick,
  my tests indicate that Http proxying is best on TCP.
