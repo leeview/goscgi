@@ -4,7 +4,6 @@ import (
 	"bytes"
 	//scgi "github.com/leeview/goscgi"
 	scgi "goscgi"
-	"html"
 	"log"
 	"runtime"
 )
