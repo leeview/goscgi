@@ -29,7 +29,10 @@ Trying to see the performance of the SimpleCGI vs FastCGI vs Go Http server + Ng
 The code and screenshots are available in `/benchmarks`.
 Nginx configuration used:
 ~~~
-	location /scgi {
+worker_processes: 4 (default)
+worker_connections: 768 (default)
+
+    location /scgi {
 		scgi_pass 127.0.0.1:8080;
         include scgi_params;
     }
